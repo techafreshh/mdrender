@@ -22,9 +22,79 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
-// Skeleton render: total escaping, no markdown rules yet.
+// Heading marker: 1-3 '#' plus exactly one space; everything after the
+// space is the heading content verbatim. `####`+ and `#` without a space
+// are not headings and fall through to paragraph text.
+const HEADING_RE = /^(#{1,3}) (.*)$/;
+// Fence marker: a line of exactly three backticks. Info strings (`​```js`)
+// are not fences and pass through as escaped paragraph text.
+const FENCE = '```';
+
+// Block rules run over already-escaped text (PRD rule 10): none of the
+// block markers (`#`, `- `, ```) contain escapable characters, so
+// classification on escaped text is exact and `escapeHtml` stays the
+// single escaping point. One pass over the lines: a blank line flushes
+// the paragraph run; a heading line emits its own tag (headings never
+// merge); consecutive `- ` lines accumulate into one `<ul>`; a fence line
+// opens a run whose content is emitted verbatim (already escaped) to the
+// closing fence or end of input — fence pairing outranks blank-line
+// splitting, so a fenced block is always exactly one `<pre><code>`. Any
+// other non-empty line joins the paragraph run, flushed as one `<p>`
+// with its lines joined by `\n`.
+function parseBlocks(escaped) {
+  const lines = escaped.split('\n');
+  const out = [];
+  let para = [];
+  const flushPara = () => {
+    if (para.length) {
+      out.push(`<p>${para.join('\n')}</p>`);
+      para = [];
+    }
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === '') {
+      flushPara();
+      i++;
+      continue;
+    }
+    const heading = line.match(HEADING_RE);
+    if (heading) {
+      flushPara();
+      out.push(`<h${heading[1].length}>${heading[2]}</h${heading[1].length}>`);
+      i++;
+      continue;
+    }
+    if (line.startsWith('- ')) {
+      flushPara();
+      const items = [];
+      while (i < lines.length && lines[i].startsWith('- ')) {
+        items.push(`<li>${lines[i].slice(2)}</li>`);
+        i++;
+      }
+      out.push(`<ul>${items.join('')}</ul>`);
+      continue;
+    }
+    if (line === FENCE) {
+      flushPara();
+      let end = i + 1;
+      while (end < lines.length && lines[end] !== FENCE) end++;
+      out.push(`<pre><code>${lines.slice(i + 1, end).join('\n')}</code></pre>`);
+      i = end < lines.length ? end + 1 : end;
+      continue;
+    }
+    para.push(line);
+    i++;
+  }
+  flushPara();
+  return out.join('');
+}
+
+// Block pipeline: escape everything first (PRD rule 10), then apply the
+// block rules over the escaped text.
 function render(md) {
-  return escapeHtml(md);
+  return parseBlocks(escapeHtml(md));
 }
 
 function sendJson(res, status, payload) {
@@ -149,4 +219,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer, escapeHtml, render };
+module.exports = { createServer, escapeHtml, parseBlocks, render };
