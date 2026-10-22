@@ -60,6 +60,39 @@ test('an asterisk list-marker lookalike stays escaped paragraph text', () => {
   assert.equal(render('*item'), '<p>*item</p>');
 });
 
+// Backslash escapes (CommonMark): `\` before an ASCII punctuation character
+// is consumed, leaving that character as inert text — so a backslash-escaped
+// asterisk renders as a plain asterisk inside a paragraph. The escape runs
+// at content-emission time, never before classification: `\- `/`\# ` must
+// NOT conjure a list/heading, and fence content stays verbatim.
+test('a backslash-escaped asterisk renders as a literal asterisk', () => {
+  assert.equal(render('\\* item'), '<p>* item</p>');
+});
+
+test('backslash escapes never create block structure', () => {
+  assert.equal(render('\\- item'), '<p>- item</p>');
+  assert.equal(render('\\# hi'), '<p># hi</p>');
+  assert.equal(render('\\```'), '<p>```</p>');
+});
+
+test('backslash escapes apply to heading and list content, never fence content', () => {
+  assert.equal(render('# \\* hi'), '<h1>* hi</h1>');
+  assert.equal(render('- \\* x'), '<ul><li>* x</li></ul>');
+  assert.equal(render('```\n\\* x\n```'), '<pre><code>\\* x</code></pre>');
+});
+
+test('backslash escapes before HTML-escapable characters stay fully escaped', () => {
+  assert.equal(render('\\&'), '<p>&amp;</p>');
+  assert.equal(render('\\<x>'), '<p>&lt;x&gt;</p>');
+  assert.equal(render('\\"q"'), '<p>&quot;q&quot;</p>');
+});
+
+test('a backslash before non-punctuation, another backslash chain, or end of input is kept', () => {
+  assert.equal(render('\\a'), '<p>\\a</p>'); // `\a` is not an escape
+  assert.equal(render('a\\\\b'), '<p>a\\b</p>'); // `\\` escapes to one backslash
+  assert.equal(render('line\\'), '<p>line\\</p>'); // trailing backslash kept
+});
+
 test('consecutive `- ` lines form one <ul>; a non-list line ends the run', () => {
   assert.equal(render('- one\n- two\n\npara'), '<ul><li>one</li><li>two</li></ul><p>para</p>');
   assert.equal(render('-a'), '<p>-a</p>');

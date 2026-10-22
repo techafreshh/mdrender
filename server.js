@@ -26,6 +26,43 @@ function escapeHtml(s) {
 // space is the heading content verbatim. `####`+ and `#` without a space
 // are not headings and fall through to paragraph text.
 const HEADING_RE = /^(#{1,3}) (.*)$/;
+
+// Backslash escapes (CommonMark): a backslash before an ASCII punctuation
+// character makes that character literal and is itself consumed. The PRD
+// lists no backslash marker, so this is a content-level rule applied only
+// when block content is emitted — never before classification (an escaped
+// `\-`/`\#` must not conjure a list/heading at the line start) and never
+// inside fences, whose content is verbatim by rule 7. It runs on the
+// already-escaped text, so the five HTML-escapable characters arrive as
+// whole entities and are passed through in that escaped form; every other
+// escaped punctuation character is inert in HTML, so the output stays
+// fully escaped. A backslash before anything else (letters, the newline
+// joining paragraph lines, end of input) is not an escape and is kept.
+const HTML_ENTITY_RE = /^&(?:amp|lt|gt|quot|#39);/;
+const PUNCTUATION = '!#$%()*+,-./:;=?@[]\\^_`{|}~';
+
+function stripBackslashEscapes(escaped) {
+  let out = '';
+  let i = 0;
+  while (i < escaped.length) {
+    if (escaped[i] === '\\' && i + 1 < escaped.length) {
+      const entity = escaped.slice(i + 1).match(HTML_ENTITY_RE);
+      if (entity) {
+        out += entity[0];
+        i += 1 + entity[0].length;
+        continue;
+      }
+      if (PUNCTUATION.includes(escaped[i + 1])) {
+        out += escaped[i + 1];
+        i += 2;
+        continue;
+      }
+    }
+    out += escaped[i];
+    i++;
+  }
+  return out;
+}
 // Fence marker: a line of exactly three backticks. Info strings (`​```js`)
 // are not fences and pass through as escaped paragraph text.
 const FENCE = '```';
@@ -47,7 +84,9 @@ function parseBlocks(escaped) {
   let para = [];
   const flushPara = () => {
     if (para.length) {
-      out.push(`<p>${para.join('\n')}</p>`);
+      // Stripped after the join: a backslash at a line's end sits before the
+      // joining newline (not punctuation) and is kept as inert text.
+      out.push(`<p>${stripBackslashEscapes(para.join('\n'))}</p>`);
       para = [];
     }
   };
@@ -62,7 +101,8 @@ function parseBlocks(escaped) {
     const heading = line.match(HEADING_RE);
     if (heading) {
       flushPara();
-      out.push(`<h${heading[1].length}>${heading[2]}</h${heading[1].length}>`);
+      const content = stripBackslashEscapes(heading[2]);
+      out.push(`<h${heading[1].length}>${content}</h${heading[1].length}>`);
       i++;
       continue;
     }
@@ -70,7 +110,7 @@ function parseBlocks(escaped) {
       flushPara();
       const items = [];
       while (i < lines.length && lines[i].startsWith('- ')) {
-        items.push(`<li>${lines[i].slice(2)}</li>`);
+        items.push(`<li>${stripBackslashEscapes(lines[i].slice(2))}</li>`);
         i++;
       }
       out.push(`<ul>${items.join('')}</ul>`);
