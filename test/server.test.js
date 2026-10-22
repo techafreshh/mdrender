@@ -97,7 +97,9 @@ test('md of exactly 100,000 characters is still accepted', async () => {
 
 test('malformed JSON and missing/non-string md return 400 with an error field', async () => {
   const srv = await startServer();
-  const badBodies = ['', 'not json', '{"x":1}', '{"md":123}'];
+  // Includes JSON primitive documents (null/true/123/"str") — `null` must be
+  // answered 400, never reach the md lookup and crash the process.
+  const badBodies = ['', 'not json', '{"x":1}', '{"md":123}', 'null', 'true', '123', '"str"', '[]', '{"md":null}'];
   for (const body of badBodies) {
     const res = await request(srv, '/render', { method: 'POST', body });
     assert.equal(res.status, 400, `status for body: ${JSON.stringify(body)}`);
@@ -110,6 +112,17 @@ test('the process survives an invalid body and keeps serving', async () => {
   const srv = await startServer();
   const bad = await request(srv, '/render', { method: 'POST', body: 'not json' });
   assert.equal(bad.status, 400);
+  const health = await request(srv, '/health');
+  assert.equal(health.status, 200);
+  assert.equal(JSON.parse(health.rawBody).ok, true);
+});
+
+test('a JSON null body gets a 4xx and the process survives it', async () => {
+  const srv = await startServer();
+  const bad = await request(srv, '/render', { method: 'POST', body: 'null' });
+  assert.equal(bad.status, 400);
+  assert.ok(JSON.parse(bad.rawBody).error);
+  // Exactly the holdout sequence: health must still serve afterwards.
   const health = await request(srv, '/health');
   assert.equal(health.status, 200);
   assert.equal(JSON.parse(health.rawBody).ok, true);

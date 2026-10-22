@@ -93,29 +93,44 @@ function handleRequest(req, res) {
 
     if (req.method === 'POST' && pathname === '/render') {
       return collectBody(req, res, (body) => {
-        let parsed;
         try {
-          parsed = JSON.parse(body);
+          let parsed;
+          try {
+            parsed = JSON.parse(body);
+          } catch {
+            return sendJson(res, 400, { error: 'invalid JSON' });
+          }
+          // JSON `null` is a legal document that parses to null; the
+          // hasOwnProperty check below would throw on it (ToObject(null)
+          // throws) — and this callback runs outside handleRequest's
+          // try/catch, so that throw would kill the process.
+          if (parsed === null || typeof parsed !== 'object') {
+            return sendJson(res, 400, { error: 'missing md' });
+          }
+          if (!Object.prototype.hasOwnProperty.call(parsed, 'md')) {
+            return sendJson(res, 400, { error: 'missing md' });
+          }
+          if (typeof parsed.md !== 'string') {
+            return sendJson(res, 400, { error: 'md must be a string' });
+          }
+          if (parsed.md.length > MAX_MD_CHARS) {
+            return sendJson(res, 413, { error: 'payload too large' });
+          }
+          return sendJson(res, 200, { html: render(parsed.md) });
         } catch {
-          return sendJson(res, 400, { error: 'invalid JSON' });
+          // Last-ditch guard: a throw in this async callback would otherwise
+          // be uncaught and crash the process — never let that happen.
+          if (!res.headersSent) return sendJson(res, 500, { error: 'internal error' });
+          res.destroy();
         }
-        if (!Object.prototype.hasOwnProperty.call(parsed, 'md')) {
-          return sendJson(res, 400, { error: 'missing md' });
-        }
-        if (typeof parsed.md !== 'string') {
-          return sendJson(res, 400, { error: 'md must be a string' });
-        }
-        if (parsed.md.length > MAX_MD_CHARS) {
-          return sendJson(res, 413, { error: 'payload too large' });
-        }
-        return sendJson(res, 200, { html: render(parsed.md) });
       });
     }
 
     return sendJson(res, 404, { error: 'not found' });
   } catch {
     // Unexpected failure must never crash the process mid-connection.
-    return sendJson(res, 500, { error: 'internal error' });
+    if (!res.headersSent) return sendJson(res, 500, { error: 'internal error' });
+    res.destroy();
   }
 }
 
