@@ -6,10 +6,11 @@ services:
     volumes:
       - ".:/app"
     init: true
-    # The runtime/holdout scenarios probe the app through these published
-    # ports, so a live instance must be listening behind each of them; sleep
-    # infinity afterwards keeps the container up regardless of app health.
-    command: ["sh", "-c", "PORT=8108 node server.js & PORT=8110 node server.js & exec sleep infinity"]
+    # The app must be live on its contract port (PORT=3000) inside the worker:
+    # the runtime/holdout scenario handlers the factory starts on the ports
+    # published below probe the app there, so nothing else may bind 3000 or
+    # 8108/8110. sleep infinity keeps the container up even if the app dies.
+    command: ["sh", "-c", "PORT=3000 node server.js & exec sleep infinity"]
     ports:
       - "127.0.0.1:8108:8108"
       - "127.0.0.1:8110:8110"
