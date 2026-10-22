@@ -6,10 +6,10 @@ services:
     volumes:
       - ".:/app"
     init: true
-    # Scenario handlers (runtime on 8108, holdout on 8110) are started by the
-    # factory itself and bind these ports inside the container; the worker's
-    # main process must stay out of the way.
-    command: ["sleep", "infinity"]
+    # The runtime/holdout scenarios probe the app through these published
+    # ports, so a live instance must be listening behind each of them; sleep
+    # infinity afterwards keeps the container up regardless of app health.
+    command: ["sh", "-c", "PORT=8108 node server.js & PORT=8110 node server.js & exec sleep infinity"]
     ports:
       - "127.0.0.1:8108:8108"
       - "127.0.0.1:8110:8110"

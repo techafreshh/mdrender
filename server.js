@@ -28,9 +28,13 @@ function render(md) {
 }
 
 function sendJson(res, status, payload) {
+  const body = JSON.stringify(payload);
   res.setHeader('Content-Type', 'application/json');
+  // Explicit length: the body always goes out framed by Content-Length in a
+  // single write, never chunked — naive wire-level readers see it verbatim.
+  res.setHeader('Content-Length', Buffer.byteLength(body));
   res.statusCode = status;
-  res.end(JSON.stringify(payload));
+  res.end(body);
 }
 
 // Collect the request body with a size cap before any parsing. A single

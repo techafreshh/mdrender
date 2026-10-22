@@ -19,8 +19,8 @@ test.after(() =>
   Promise.all([...servers].map((server) => new Promise((resolve) => server.close(resolve))))
 );
 
-// Minimal node:http client; resolves {status, rawBody} once the full
-// response body has been consumed.
+// Minimal node:http client; resolves {status, headers, rawBody} once the
+// full response body has been consumed.
 function request(server, path, { method = 'GET', body = null } = {}) {
   return new Promise((resolve, reject) => {
     const headers = body !== null ? { 'Content-Length': Buffer.byteLength(body) } : {};
@@ -30,7 +30,11 @@ function request(server, path, { method = 'GET', body = null } = {}) {
         const chunks = [];
         res.on('data', (c) => chunks.push(c));
         res.on('end', () =>
-          resolve({ status: res.statusCode, rawBody: Buffer.concat(chunks).toString('utf8') })
+          resolve({
+            status: res.statusCode,
+            headers: res.headers,
+            rawBody: Buffer.concat(chunks).toString('utf8'),
+          })
         );
       }
     );
@@ -109,6 +113,17 @@ test('the process survives an invalid body and keeps serving', async () => {
   const health = await request(srv, '/health');
   assert.equal(health.status, 200);
   assert.equal(JSON.parse(health.rawBody).ok, true);
+});
+
+test('every response carries an exact Content-Length (never chunked)', async () => {
+  const srv = await startServer();
+  const health = await request(srv, '/health');
+  assert.equal(health.headers['content-length'], String(Buffer.byteLength(health.rawBody)));
+  const render = await request(srv, '/render', {
+    method: 'POST',
+    body: JSON.stringify({ md: 'a & b <c> "d" \'e\'' }),
+  });
+  assert.equal(render.headers['content-length'], String(Buffer.byteLength(render.rawBody)));
 });
 
 test('unmatched method+path returns 404 with an error field', async () => {
