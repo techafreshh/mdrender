@@ -92,9 +92,12 @@ function parseBlocks(escaped) {
 }
 
 // Block pipeline: escape everything first (PRD rule 10), then apply the
-// block rules over the escaped text.
+// block rules over the escaped text. Line endings are normalized first:
+// CR and CRLF are line boundaries exactly like LF (CommonMark), and a
+// stray `\r` left inside a block would leak into the emitted HTML and
+// corrupt exact-body output.
 function render(md) {
-  return parseBlocks(escapeHtml(md));
+  return parseBlocks(escapeHtml(md.replace(/\r\n?/g, '\n')));
 }
 
 function sendJson(res, status, payload) {

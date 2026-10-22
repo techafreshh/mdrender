@@ -53,6 +53,13 @@ test('#### or deeper, and # without a space, stay escaped paragraph text', () =>
   assert.equal(render('#NoSpace'), '<p>#NoSpace</p>');
 });
 
+// `* ` is an unordered-list marker in full markdown but not in our subset:
+// it must pass through as escaped paragraph text, never become a <ul>.
+test('an asterisk list-marker lookalike stays escaped paragraph text', () => {
+  assert.equal(render('* item'), '<p>* item</p>');
+  assert.equal(render('*item'), '<p>*item</p>');
+});
+
 test('consecutive `- ` lines form one <ul>; a non-list line ends the run', () => {
   assert.equal(render('- one\n- two\n\npara'), '<ul><li>one</li><li>two</li></ul><p>para</p>');
   assert.equal(render('-a'), '<p>-a</p>');
@@ -89,6 +96,19 @@ test('consecutive non-blank lines merge into one paragraph', () => {
 
 test('a blank line always ends the paragraph run', () => {
   assert.equal(render('a\n\n\n\nb'), '<p>a</p><p>b</p>');
+});
+
+// CR and CRLF are line boundaries exactly like LF (CommonMark); a `\r` left
+// inside a block would leak into the HTML and corrupt exact-body output.
+test('CRLF and lone-CR line endings are normalized before block parsing', () => {
+  assert.equal(
+    render('line one\r\nline two\r\n\r\nline three'),
+    '<p>line one\nline two</p><p>line three</p>'
+  );
+  assert.equal(render('a\rb'), '<p>a\nb</p>');
+  assert.equal(render('# Alpha\r\n## Beta'), '<h1>Alpha</h1><h2>Beta</h2>');
+  assert.equal(render('* item\r\n'), '<p>* item</p>');
+  assert.equal(render('```\r\na\r\n```'), '<pre><code>a</code></pre>');
 });
 
 test('block content is escaped in every position', () => {
@@ -136,4 +156,13 @@ test('wire bodies match the acceptance contract exactly', async () => {
   });
   assert.equal(para.status, 200);
   assert.equal(para.rawBody, '{"html":"<p>line one\\nline two</p><p>line three</p>"}');
+
+  // Same document arriving with CRLF line endings must produce the exact
+  // same wire body — no `\r` may survive into the emitted HTML.
+  const crlf = await request(srv, '/render', {
+    method: 'POST',
+    body: JSON.stringify({ md: 'line one\r\nline two\r\n\r\nline three' }),
+  });
+  assert.equal(crlf.status, 200);
+  assert.equal(crlf.rawBody, '{"html":"<p>line one\\nline two</p><p>line three</p>"}');
 });
