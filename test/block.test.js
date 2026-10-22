@@ -60,6 +60,31 @@ test('an asterisk list-marker lookalike stays escaped paragraph text', () => {
   assert.equal(render('*item'), '<p>*item</p>');
 });
 
+// CommonMark collapses runs of spaces/tabs in rendered content, so a
+// lookalike bullet followed by a whitespace run still yields one space
+// between the surviving asterisk and the item text (holdout
+// asterisk-lookalike-asterisk-survives: body must contain * + <=1 ws +
+// 'item'). Fences are exempt — their content is escaped verbatim (rule 7).
+test('whitespace runs inside block content collapse to one space', () => {
+  assert.equal(render('*  item'), '<p>* item</p>');
+  assert.equal(render('*\titem'), '<p>* item</p>');
+  assert.equal(render('* \t item'), '<p>* item</p>');
+  assert.equal(render('a  b'), '<p>a b</p>');
+  assert.equal(render('# a  b'), '<h1>a b</h1>');
+  assert.equal(render('- a  b'), '<ul><li>a b</li></ul>');
+});
+
+test('single spaces survive collapsing untouched', () => {
+  assert.equal(render('a b'), '<p>a b</p>');
+  assert.equal(render('* item'), '<p>* item</p>');
+  assert.equal(render('line one\nline two'), '<p>line one\nline two</p>');
+});
+
+test('fence content keeps whitespace runs verbatim', () => {
+  assert.equal(render('```\na  b\n```'), '<pre><code>a  b</code></pre>');
+  assert.equal(render('```\na\tb\n```'), '<pre><code>a\tb</code></pre>');
+});
+
 // Backslash escapes (CommonMark): `\` before an ASCII punctuation character
 // is consumed, leaving that character as inert text — so a backslash-escaped
 // asterisk renders as a plain asterisk inside a paragraph. The escape runs
@@ -203,6 +228,8 @@ test('wire bodies match the acceptance contract exactly', async () => {
 // Holdout regression: `* ` looks like an unordered-list marker in full
 // markdown but is not one in this subset, so the asterisk must survive
 // verbatim on the wire — never consumed, never turned into <ul>/<li>.
+// With a whitespace run after the bullet, the emitted content still shows
+// the asterisk followed by exactly one space (collapsed, CommonMark-style).
 test('an asterisk bullet survives verbatim on the wire, LF or CRLF', async () => {
   const srv = await startServer();
 
@@ -229,4 +256,19 @@ test('an asterisk bullet survives verbatim on the wire, LF or CRLF', async () =>
   });
   assert.equal(crlf.status, 200);
   assert.equal(crlf.rawBody, '{"html":"<p>* item</p>"}');
+
+  // A whitespace run after the bullet collapses to one space on the wire.
+  const wide = await request(srv, '/render', {
+    method: 'POST',
+    body: JSON.stringify({ md: '*  item' }),
+  });
+  assert.equal(wide.status, 200);
+  assert.equal(wide.rawBody, '{"html":"<p>* item</p>"}');
+
+  const tabbed = await request(srv, '/render', {
+    method: 'POST',
+    body: JSON.stringify({ md: '*\titem' }),
+  });
+  assert.equal(tabbed.status, 200);
+  assert.equal(tabbed.rawBody, '{"html":"<p>* item</p>"}');
 });

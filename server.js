@@ -63,6 +63,18 @@ function stripBackslashEscapes(escaped) {
   }
   return out;
 }
+// Whitespace normalization for emitted block content (CommonMark renders
+// runs of spaces and tabs inside paragraphs, headings, and list items as
+// one space; fences stay verbatim by rule 7). It runs on the
+// already-escaped text: the five HTML-escapable characters arrive as whole
+// entities (`&amp;` `&lt;` `&gt;` `&quot;` `&#39;`) which contain no space
+// or tab, so collapsing can never split or corrupt an entity. The newline
+// joining paragraph lines is untouched — bullet 5 pins `\n` between
+// merged lines.
+function collapseWhitespace(escaped) {
+  return escaped.replace(/[ \t]+/g, ' ');
+}
+
 // Fence marker: a line of exactly three backticks. Info strings (`​```js`)
 // are not fences and pass through as escaped paragraph text.
 const FENCE = '```';
@@ -77,7 +89,8 @@ const FENCE = '```';
 // closing fence or end of input — fence pairing outranks blank-line
 // splitting, so a fenced block is always exactly one `<pre><code>`. Any
 // other non-empty line joins the paragraph run, flushed as one `<p>`
-// with its lines joined by `\n`.
+// with its lines joined by `\n` (whitespace runs inside emitted content
+// collapse to one space; see collapseWhitespace).
 function parseBlocks(escaped) {
   const lines = escaped.split('\n');
   const out = [];
@@ -86,7 +99,7 @@ function parseBlocks(escaped) {
     if (para.length) {
       // Stripped after the join: a backslash at a line's end sits before the
       // joining newline (not punctuation) and is kept as inert text.
-      out.push(`<p>${stripBackslashEscapes(para.join('\n'))}</p>`);
+      out.push(`<p>${collapseWhitespace(stripBackslashEscapes(para.join('\n')))}</p>`);
       para = [];
     }
   };
@@ -101,7 +114,7 @@ function parseBlocks(escaped) {
     const heading = line.match(HEADING_RE);
     if (heading) {
       flushPara();
-      const content = stripBackslashEscapes(heading[2]);
+      const content = collapseWhitespace(stripBackslashEscapes(heading[2]));
       out.push(`<h${heading[1].length}>${content}</h${heading[1].length}>`);
       i++;
       continue;
@@ -110,7 +123,7 @@ function parseBlocks(escaped) {
       flushPara();
       const items = [];
       while (i < lines.length && lines[i].startsWith('- ')) {
-        items.push(`<li>${stripBackslashEscapes(lines[i].slice(2))}</li>`);
+        items.push(`<li>${collapseWhitespace(stripBackslashEscapes(lines[i].slice(2)))}</li>`);
         i++;
       }
       out.push(`<ul>${items.join('')}</ul>`);
