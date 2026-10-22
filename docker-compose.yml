@@ -1,0 +1,15 @@
+# Factory worker: every stage of the build runs inside this container.
+services:
+  worker:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - ".:/app"
+    init: true
+    # Scenario handlers (runtime on 8108, holdout on 8110) are started by the
+    # factory itself and bind these ports inside the container; the worker's
+    # main process must stay out of the way.
+    command: ["sleep", "infinity"]
+    ports:
+      - "127.0.0.1:8108:8108"
+      - "127.0.0.1:8110:8110"
