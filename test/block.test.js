@@ -199,3 +199,34 @@ test('wire bodies match the acceptance contract exactly', async () => {
   assert.equal(crlf.status, 200);
   assert.equal(crlf.rawBody, '{"html":"<p>line one\\nline two</p><p>line three</p>"}');
 });
+
+// Holdout regression: `* ` looks like an unordered-list marker in full
+// markdown but is not one in this subset, so the asterisk must survive
+// verbatim on the wire — never consumed, never turned into <ul>/<li>.
+test('an asterisk bullet survives verbatim on the wire, LF or CRLF', async () => {
+  const srv = await startServer();
+
+  const lf = await request(srv, '/render', {
+    method: 'POST',
+    body: JSON.stringify({ md: '* item' }),
+  });
+  assert.equal(lf.status, 200);
+  assert.equal(lf.rawBody, '{"html":"<p>* item</p>"}');
+
+  // No space after the asterisk: still plain paragraph text.
+  const tight = await request(srv, '/render', {
+    method: 'POST',
+    body: JSON.stringify({ md: '*item' }),
+  });
+  assert.equal(tight.status, 200);
+  assert.equal(tight.rawBody, '{"html":"<p>*item</p>"}');
+
+  // A CRLF-terminated document must render byte-identically to the LF
+  // form: the asterisk survives and no \r leaks into the emitted HTML.
+  const crlf = await request(srv, '/render', {
+    method: 'POST',
+    body: JSON.stringify({ md: '* item\r\n' }),
+  });
+  assert.equal(crlf.status, 200);
+  assert.equal(crlf.rawBody, '{"html":"<p>* item</p>"}');
+});
