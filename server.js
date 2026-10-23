@@ -22,9 +22,140 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
-// Skeleton render: total escaping, no markdown rules yet.
+// Heading marker: 1-3 '#' plus exactly one space; everything after the
+// space is the heading content verbatim. `####`+ and `#` without a space
+// are not headings and fall through to paragraph text.
+const HEADING_RE = /^(#{1,3}) (.*)$/;
+
+// Backslash escapes (CommonMark): a backslash before an ASCII punctuation
+// character makes that character literal and is itself consumed. The PRD
+// lists no backslash marker, so this is a content-level rule applied only
+// when block content is emitted — never before classification (an escaped
+// `\-`/`\#` must not conjure a list/heading at the line start) and never
+// inside fences, whose content is verbatim by rule 7. It runs on the
+// already-escaped text, so the five HTML-escapable characters arrive as
+// whole entities and are passed through in that escaped form; every other
+// escaped punctuation character is inert in HTML, so the output stays
+// fully escaped. A backslash before anything else (letters, the newline
+// joining paragraph lines, end of input) is not an escape and is kept.
+const HTML_ENTITY_RE = /^&(?:amp|lt|gt|quot|#39);/;
+const PUNCTUATION = '!#$%()*+,-./:;=?@[]\\^_`{|}~';
+
+function stripBackslashEscapes(escaped) {
+  let out = '';
+  let i = 0;
+  while (i < escaped.length) {
+    if (escaped[i] === '\\' && i + 1 < escaped.length) {
+      const entity = escaped.slice(i + 1).match(HTML_ENTITY_RE);
+      if (entity) {
+        out += entity[0];
+        i += 1 + entity[0].length;
+        continue;
+      }
+      if (PUNCTUATION.includes(escaped[i + 1])) {
+        out += escaped[i + 1];
+        i += 2;
+        continue;
+      }
+    }
+    out += escaped[i];
+    i++;
+  }
+  return out;
+}
+
+// Whitespace normalization for emitted block content (CommonMark collapses
+// runs of whitespace inside paragraphs, headings, and list items to one
+// space; fences stay verbatim by rule 7). The class is every whitespace
+// character except the joining `\n`: space/tab runs, but also NBSP, form
+// feed, vertical tab, and the other Unicode whitespace — all must come out
+// as one plain ASCII space, because on the wire JSON.stringify escapes
+// control characters (`\f`, `\u000b`), leaving no whitespace for a consumer
+// that matches marker + one space + text. It runs on the already-escaped
+// text: the five HTML-escapable characters arrive as whole entities (`&amp;`
+// `&lt;` `&gt;` `&quot;` `&#39;`) which contain no whitespace, so collapsing
+// can never split or corrupt an entity. The newline joining paragraph lines
+// is untouched — bullet 5 pins `\n` between merged lines.
+function collapseWhitespace(escaped) {
+  return escaped.replace(/[^\S\n]+/g, ' ');
+}
+
+// Fence marker: a line of exactly three backticks. Info strings (`​```js`)
+// are not fences and pass through as escaped paragraph text.
+const FENCE = '```';
+
+// Block rules run over already-escaped text (PRD rule 10): none of the
+// block markers (`#`, `- `, ```) contain escapable characters, so
+// classification on escaped text is exact and `escapeHtml` stays the
+// single escaping point. One pass over the lines: a blank line flushes
+// the paragraph run; a heading line emits its own tag (headings never
+// merge); consecutive `- ` lines accumulate into one `<ul>`; a fence line
+// opens a run whose content is emitted verbatim (already escaped) to the
+// closing fence or end of input — fence pairing outranks blank-line
+// splitting, so a fenced block is always exactly one `<pre><code>`. Any
+// other non-empty line joins the paragraph run, flushed as one `<p>`
+// with its lines joined by `\n` (whitespace runs inside emitted content
+// collapse to one space; see collapseWhitespace).
+function parseBlocks(escaped) {
+  const lines = escaped.split('\n');
+  const out = [];
+  let para = [];
+  const flushPara = () => {
+    if (para.length) {
+      // Stripped after the join: a backslash at a line's end sits before the
+      // joining newline (not punctuation) and is kept as inert text.
+      out.push(`<p>${collapseWhitespace(stripBackslashEscapes(para.join('\n')))}</p>`);
+      para = [];
+    }
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === '') {
+      flushPara();
+      i++;
+      continue;
+    }
+    const heading = line.match(HEADING_RE);
+    if (heading) {
+      flushPara();
+      const content = collapseWhitespace(stripBackslashEscapes(heading[2]));
+      out.push(`<h${heading[1].length}>${content}</h${heading[1].length}>`);
+      i++;
+      continue;
+    }
+    if (line.startsWith('- ')) {
+      flushPara();
+      const items = [];
+      while (i < lines.length && lines[i].startsWith('- ')) {
+        items.push(`<li>${collapseWhitespace(stripBackslashEscapes(lines[i].slice(2)))}</li>`);
+        i++;
+      }
+      out.push(`<ul>${items.join('')}</ul>`);
+      continue;
+    }
+    if (line === FENCE) {
+      flushPara();
+      let end = i + 1;
+      while (end < lines.length && lines[end] !== FENCE) end++;
+      out.push(`<pre><code>${lines.slice(i + 1, end).join('\n')}</code></pre>`);
+      i = end < lines.length ? end + 1 : end;
+      continue;
+    }
+    para.push(line);
+    i++;
+  }
+  flushPara();
+  return out.join('');
+}
+
+// Block pipeline: escape everything first (PRD rule 10), then apply the
+// block rules over the escaped text. Line endings are normalized first:
+// CR and CRLF are line boundaries exactly like LF (CommonMark), and a
+// stray `\r` left inside a block would leak into the emitted HTML and
+// corrupt exact-body output.
 function render(md) {
-  return escapeHtml(md);
+  return parseBlocks(escapeHtml(md.replace(/\r\n?/g, '\n')));
 }
 
 function sendJson(res, status, payload) {
@@ -149,4 +280,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer, escapeHtml, render };
+module.exports = { createServer, escapeHtml, parseBlocks, render };

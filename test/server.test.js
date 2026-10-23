@@ -58,22 +58,25 @@ test('POST /render escapes the golden pair exactly', async () => {
     body: JSON.stringify({ md: 'a & b <c> "d" \'e\'' }),
   });
   assert.equal(res.status, 200);
-  // Golden escape table, character for character.
+  // Golden escape table, character for character, wrapped in the block
+  // pipeline's paragraph element.
   assert.equal(
     res.rawBody,
-    '{"html":"a &amp; b &lt;c&gt; &quot;d&quot; &#39;e&#39;"}'
+    '{"html":"<p>a &amp; b &lt;c&gt; &quot;d&quot; &#39;e&#39;</p>"}'
   );
 });
 
 test('escaping replaces & first (no double-escape)', async () => {
   assert.equal(escapeHtml('&lt;'), '&amp;lt;');
-  assert.equal(render('&lt;'), '&amp;lt;');
+  // Single-escaped content, now inside the block paragraph: still no
+  // double-escape.
+  assert.equal(render('&lt;'), '<p>&amp;lt;</p>');
   const srv = await startServer();
   const res = await request(srv, '/render', {
     method: 'POST',
     body: JSON.stringify({ md: '&lt;' }),
   });
-  assert.equal(JSON.parse(res.rawBody).html, '&amp;lt;');
+  assert.equal(JSON.parse(res.rawBody).html, '<p>&amp;lt;</p>');
 });
 
 test('md of 100,001 characters returns 413 with the exact error body', async () => {
