@@ -186,9 +186,14 @@ function renderInline(escaped) {
       if (escaped[i + 1] === '*') {
         // Bold: next `**` pair-start strictly after i+1, so the close can
         // never overlap the opener; empty content (`****`) stays literal.
+        // Flanking: an opener followed by whitespace (or a closer preceded
+        // by it) takes no part in emphasis — `** still **` falls through to
+        // the one-char verbatim emit, so both stars stay inert text. A
+        // rejected candidate degrades to escaped literal text, which is
+        // always the safe direction.
         const close = afterDoubleStar(i + 1);
         const content = close !== -1 ? escaped.slice(i + 2, close) : '';
-        if (content !== '') {
+        if (content !== '' && !/^\s/.test(content) && !/\s$/.test(content)) {
           out += `<strong>${content}</strong>`;
           i = close + 2;
           continue;
@@ -196,20 +201,34 @@ function renderInline(escaped) {
       } else {
         // Italic: next `*` after the opener. A failed bold emits one `*`,
         // so `**a` stays literal while `**a*` can still close as italic.
+        // Flanking mirrors the bold rule: whitespace at either edge of the
+        // matched content rejects the match (single-line or not), so
+        // `* unmatched` can never open and stays escaped literal text. The
+        // newline joining paragraph lines is not an edge: `x*y\nz*w` emits
+        // `<em>y\nz</em>` — flanking is the only newline restriction.
         const close = afterStar(i);
         const content = close !== -1 ? escaped.slice(i + 1, close) : '';
-        if (content !== '') {
+        if (content !== '' && !/^\s/.test(content) && !/\s$/.test(content)) {
           out += `<em>${content}</em>`;
           i = close + 1;
           continue;
         }
       }
-    } else if (escaped[i] === '[') {
+    } else if (escaped[i] === '[' && escaped[i - 1] !== '!') {
       // Link: `[` + non-empty text + `]` immediately followed by `(` +
       // non-empty whitespace-free URL up to the first `)`. The URL is
       // already escaped (`&amp;`, `&quot;`), so the href attribute cannot
       // be broken out of; any whitespace (including the joining `\n`)
       // rejects the match, so link titles and multiline URLs stay literal.
+      // A `!` immediately before the opener makes this an image-bang
+      // (`![alt](url)`) — images are unsupported (PRD rule 11), so the
+      // whole run must stay literal; letting the inner `[text](url)` close
+      // would leak a raw `<a href>` out of an inert construct. The guard is
+      // exact: scan offsets track the input 1:1 (opener characters are
+      // emitted verbatim, never consumed) and escapeHtml leaves `!`
+      // untouched, so `escaped[i - 1]` is the input character before this
+      // `[`. A backslash-escaped `\!` lands here too (the escape branch
+      // copies `!` verbatim), so `\![a](b)` stays literal as well.
       const close = afterCloseBracket(i);
       if (close !== -1 && escaped[close + 1] === '(') {
         const text = escaped.slice(i + 1, close);
