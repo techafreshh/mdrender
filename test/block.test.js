@@ -60,15 +60,22 @@ test('an asterisk list-marker lookalike stays escaped paragraph text', () => {
   assert.equal(render('*item'), '<p>*item</p>');
 });
 
-// CommonMark collapses runs of spaces/tabs in rendered content, so a
-// lookalike bullet followed by a whitespace run still yields one space
-// between the surviving asterisk and the item text (holdout
+// CommonMark collapses runs of whitespace in rendered content, so a
+// lookalike bullet followed by a whitespace run still yields one ASCII
+// space between the surviving asterisk and the item text (holdout
 // asterisk-lookalike-asterisk-survives: body must contain * + <=1 ws +
-// 'item'). Fences are exempt — their content is escaped verbatim (rule 7).
+// 'item'). The run may contain any whitespace except the joining newline:
+// NBSP, form feed, vertical tab — control characters would otherwise be
+// JSON-escaped on the wire (`\f`, `\u000b`) and stop reading as whitespace
+// at all. Fences are exempt — their content is escaped verbatim (rule 7).
 test('whitespace runs inside block content collapse to one space', () => {
   assert.equal(render('*  item'), '<p>* item</p>');
   assert.equal(render('*\titem'), '<p>* item</p>');
   assert.equal(render('* \t item'), '<p>* item</p>');
+  assert.equal(render('* \u00A0item'), '<p>* item</p>'); // NBSP mixed into the run
+  assert.equal(render('*\u00A0\u00A0item'), '<p>* item</p>');
+  assert.equal(render('*\fitem'), '<p>* item</p>'); // form feed
+  assert.equal(render('*\vitem'), '<p>* item</p>'); // vertical tab
   assert.equal(render('a  b'), '<p>a b</p>');
   assert.equal(render('# a  b'), '<h1>a b</h1>');
   assert.equal(render('- a  b'), '<ul><li>a b</li></ul>');
@@ -83,6 +90,8 @@ test('single spaces survive collapsing untouched', () => {
 test('fence content keeps whitespace runs verbatim', () => {
   assert.equal(render('```\na  b\n```'), '<pre><code>a  b</code></pre>');
   assert.equal(render('```\na\tb\n```'), '<pre><code>a\tb</code></pre>');
+  // Even non-`[ \t]` whitespace stays verbatim inside a fence (rule 7).
+  assert.equal(render('```\na\fb\n```'), '<pre><code>a\fb</code></pre>');
 });
 
 // Backslash escapes (CommonMark): `\` before an ASCII punctuation character
@@ -271,4 +280,13 @@ test('an asterisk bullet survives verbatim on the wire, LF or CRLF', async () =>
   });
   assert.equal(tabbed.status, 200);
   assert.equal(tabbed.rawBody, '{"html":"<p>* item</p>"}');
+
+  // A run mixing plain and non-ASCII whitespace also collapses to the one
+  // raw space the wire regex can bridge.
+  const nbspMix = await request(srv, '/render', {
+    method: 'POST',
+    body: JSON.stringify({ md: '* \u00A0item' }),
+  });
+  assert.equal(nbspMix.status, 200);
+  assert.equal(nbspMix.rawBody, '{"html":"<p>* item</p>"}');
 });

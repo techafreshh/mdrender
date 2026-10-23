@@ -63,16 +63,21 @@ function stripBackslashEscapes(escaped) {
   }
   return out;
 }
-// Whitespace normalization for emitted block content (CommonMark renders
-// runs of spaces and tabs inside paragraphs, headings, and list items as
-// one space; fences stay verbatim by rule 7). It runs on the
-// already-escaped text: the five HTML-escapable characters arrive as whole
-// entities (`&amp;` `&lt;` `&gt;` `&quot;` `&#39;`) which contain no space
-// or tab, so collapsing can never split or corrupt an entity. The newline
-// joining paragraph lines is untouched — bullet 5 pins `\n` between
-// merged lines.
+
+// Whitespace normalization for emitted block content (CommonMark collapses
+// runs of whitespace inside paragraphs, headings, and list items to one
+// space; fences stay verbatim by rule 7). The class is every whitespace
+// character except the joining `\n`: space/tab runs, but also NBSP, form
+// feed, vertical tab, and the other Unicode whitespace — all must come out
+// as one plain ASCII space, because on the wire JSON.stringify escapes
+// control characters (`\f`, `\u000b`), leaving no whitespace for a consumer
+// that matches marker + one space + text. It runs on the already-escaped
+// text: the five HTML-escapable characters arrive as whole entities (`&amp;`
+// `&lt;` `&gt;` `&quot;` `&#39;`) which contain no whitespace, so collapsing
+// can never split or corrupt an entity. The newline joining paragraph lines
+// is untouched — bullet 5 pins `\n` between merged lines.
 function collapseWhitespace(escaped) {
-  return escaped.replace(/[ \t]+/g, ' ');
+  return escaped.replace(/[^\S\n]+/g, ' ');
 }
 
 // Fence marker: a line of exactly three backticks. Info strings (`​```js`)
