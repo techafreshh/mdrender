@@ -10,7 +10,11 @@ services:
     # the runtime/holdout scenario handlers the factory starts on the ports
     # published below probe the app there, so nothing else may bind 3000 or
     # 8108/8110. sleep infinity keeps the container up even if the app dies.
+    # 3000 is additionally published on the host loopback so the CI delivery
+    # gate and any local probe can exercise the exact contract bytes from
+    # outside; inside the container the app remains the only binder of 3000.
     command: ["sh", "-c", "PORT=3000 node server.js & exec sleep infinity"]
     ports:
+      - "127.0.0.1:3000:3000"
       - "127.0.0.1:8108:8108"
       - "127.0.0.1:8110:8110"

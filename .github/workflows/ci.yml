@@ -1,4 +1,7 @@
 # Zero dependencies: checkout, pin Node 22, run the built-in test runner.
+# `test` runs the unit suite; `delivery` runs the real container: compose up,
+# poll /health over 127.0.0.1, replay exact contract bodies, then run the
+# suite inside the worker.
 name: CI
 
 on:
@@ -15,3 +18,26 @@ jobs:
         with:
           node-version: 22
       - run: node --test
+
+  delivery:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Start the stack inside the worker container
+        run: docker compose up -d
+      - name: Wait for /health over 127.0.0.1
+        run: node e2e.mjs wait
+      - name: Replay the contract, asserting exact bodies
+        run: node e2e.mjs replay
+      - name: Run the test suite inside the worker
+        run: docker compose exec -T worker node --test
+      - name: Container diagnostics
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --tail=200 worker
