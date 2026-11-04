@@ -100,7 +100,7 @@ chunked.
 | Case | Status | Body |
 | --- | --- | --- |
 | Request body is not valid JSON | `400` | `{"error":"invalid JSON"}` |
-| `md` is missing | `400` | `{"error":"missing md"}` |
+| Body is valid JSON but not an object, or has no `md` | `400` | `{"error":"missing md"}` |
 | `md` is not a string | `400` | `{"error":"md must be a string"}` |
 | `md` is longer than 100,000 characters | `413` | `{"error":"payload too large"}` |
 | Raw request body is over 1,000,000 bytes | `413` | `{"error":"payload too large"}` |
