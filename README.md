@@ -10,9 +10,9 @@
 `mdrender` is a small HTTP service that renders a deliberately narrow Markdown
 subset to HTML and returns it as JSON from `POST /render`. Everything outside
 that subset is HTML-escaped before any rule runs, so untrusted input can only
-ever produce inert markup. The server is a single file — [`server.js`](./server.js) —
-built on `node:http`: no runtime dependencies, no filesystem access, no child
-processes.
+ever produce inert markup; the whole server is one file —
+[`server.js`](./server.js) — built on `node:http`, with no runtime
+dependencies, no filesystem access and no child processes.
 
 ## Why it exists
 
@@ -87,6 +87,8 @@ docker compose down
 | `GET /health` | `200` | `{"ok":true}` |
 | `POST /render` with `{"md":"<markdown>"}` | `200` | `{"html":"<html>"}` |
 | any other method + path | `404` | `{"error":"not found"}` |
+
+The request `Content-Type` is not checked: the body is always parsed as JSON.
 
 ### Errors
 
