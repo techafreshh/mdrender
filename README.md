@@ -10,7 +10,7 @@
 `mdrender` is a small HTTP service that renders a deliberately narrow Markdown
 subset to HTML and returns it as JSON from `POST /render`. Everything outside
 that subset is HTML-escaped before any rule runs, so untrusted input can only
-ever produce inert markup. The whole product is one file — [`server.js`](./server.js) —
+ever produce inert markup. The server is a single file — [`server.js`](./server.js) —
 built on `node:http`: no runtime dependencies, no filesystem access, no child
 processes.
 
@@ -27,9 +27,11 @@ the rendering rules and non-goals.
 Requirements: Node.js 22 or newer. Nothing else — there is no `package.json`
 and no dependency install step.
 
-Start the server:
+Get the code and start the server:
 
 ```bash
+git clone https://github.com/techafreshh/mdrender.git
+cd mdrender
 node server.js
 # mdrender listening on port 3000
 ```
@@ -104,8 +106,8 @@ rejected.
 
 ### Supported syntax
 
-Inputs are whole documents: a single construct renders inside its block tag,
-so the paragraph wrapper visible below is expected.
+Each row is a whole document: an inline-only input is still wrapped in `<p>`,
+so the paragraph wrappers below are expected.
 
 | Input | Output |
 | --- | --- |
@@ -120,9 +122,10 @@ so the paragraph wrapper visible below is expected.
 | a line of exactly three backticks, `code`, another three-backtick line | `<pre><code>code</code></pre>` |
 | `plain line` | `<p>plain line</p>` |
 
-Blank lines separate blocks; consecutive non-blank lines of the same type are
-merged into one block (paragraph lines are joined by `\n`, list items share one
-`<ul>`, fenced content stays verbatim). Headings never merge.
+Blank lines separate blocks (except inside a fence); consecutive non-blank
+lines of the same type are merged into one block (paragraph lines are joined by
+`\n`, list items share one `<ul>`, fenced content stays verbatim). Headings
+never merge.
 
 > [!NOTE]
 > Escaping runs first and everywhere: `&` → `&amp;`, `<` → `&lt;`, `>` →
