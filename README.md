@@ -1,6 +1,6 @@
 # mdrender
 
-> Render untrusted Markdown to inert HTML — one process, one endpoint, zero dependencies.
+> Render untrusted Markdown to inert HTML — one process, two endpoints, zero dependencies.
 
 [![CI](https://github.com/techafreshh/mdrender/actions/workflows/ci.yml/badge.svg)](https://github.com/techafreshh/mdrender/actions/workflows/ci.yml)
 ![Node.js >=22](https://img.shields.io/badge/Node.js-%3E%3D22-3c873a?style=flat-square)
