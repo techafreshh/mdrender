@@ -90,8 +90,9 @@ docker compose down
 ### Errors
 
 Every failure is a JSON body, never a crash: the process survives any invalid
-input and keeps serving. Responses are always framed by `Content-Length` in a
-single write — never chunked.
+input and keeps serving. Responses always carry `Content-Type:
+application/json` and are framed by `Content-Length` in a single write — never
+chunked.
 
 | Case | Status | Body |
 | --- | --- | --- |
@@ -148,6 +149,8 @@ The renderer reads no other environment variables and writes no files.
 
 ## Limitations
 
+- Headings are ATX levels 1–3 only: `####` and deeper render as paragraph
+  text, as does a `#` without a following space.
 - Flat, single-level lists only: `- ` must start at column 0; an indented `- `
   line is paragraph text. There are no ordered lists, nested lists, tables,
   images, blockquotes, setext headings, reference links, footnotes, task lists
