@@ -156,9 +156,10 @@ The renderer reads no other environment variables and writes no files.
   line is paragraph text. There are no ordered lists, nested lists, tables,
   images, blockquotes, setext headings, reference links, footnotes, task lists
   or strikethrough.
-- No fence info strings: a fence is a line of exactly three backticks, so
-  `` ```js `` is paragraph text rather than a fence opener. An unterminated fence
-  consumes the rest of the input as code-block content.
+- No fence info strings: a fence is a line of exactly three backticks, so an
+  opener with an info string (three backticks followed by `js`, say) stays
+  paragraph text, and its own closing line then starts a fence of its own. An
+  unterminated fence consumes the rest of the input as code-block content.
 - No syntax highlighting, themes or formatting options.
 - No sanitizer or allow-list mode: raw HTML is always escaped and there is no
   opt-out.
