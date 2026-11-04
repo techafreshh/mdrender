@@ -169,7 +169,7 @@ The renderer reads no other environment variables and writes no files.
 ```
 server.js                 HTTP server and the renderer
 e2e.mjs                   Delivery probe: poll /health, replay exact contract bodies
-test/                     node:test suites (golden, block, inline, adversarial, server)
+test/                     node:test suites (golden, block, inline, adversarial, server, readme)
 docker-compose.yml        Worker container (node:22-slim, PORT=3000)
 .github/workflows/ci.yml  CI: unit suite plus container delivery gate
 PRD.md                    Authoritative render contract and non-goals
@@ -200,6 +200,11 @@ The probe modes are separate too: `node e2e.mjs wait` only polls `/health`,
 `node e2e.mjs replay` only replays the contract, and
 `E2E_BASE_URL=http://host:port node e2e.mjs replay` points it at another
 instance.
+
+`test/readme.test.js` keeps this document honest: it fails when a required
+section disappears, when `server.js` or `e2e.mjs` starts reading an
+undocumented environment variable, or when a documented command loses the file
+that backs it.
 
 CI runs the unit suite on Node 22, then a delivery job that starts the worker
 container, waits for `/health`, replays the contract and runs the suite inside
