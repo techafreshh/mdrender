@@ -24,8 +24,9 @@ the rendering rules and non-goals.
 
 ## Quickstart
 
-Requirements: Node.js 22 or newer. Nothing else — there is no `package.json`
-and no dependency install step.
+Requirements: Node.js 22 or newer. Nothing else for the plain-Node path —
+there is no `package.json` and no dependency install step. The optional
+container path below also needs Docker with the Compose v2 plugin.
 
 Get the code and start the server:
 
