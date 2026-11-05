@@ -172,6 +172,8 @@ The renderer reads no other environment variables and writes no files.
   persistence, authentication, rate limiting, metrics or multi-tenancy.
 - The renderer is configured only by environment variables — no config files,
   no CLI flags.
+- No host or bind-address setting: the process listens on every interface, while
+  `docker-compose.yml` publishes it on `127.0.0.1` only.
 - No `package.json`, build step or `Dockerfile`; the worker runs the stock
   `node:22-slim` image.
 
