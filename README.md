@@ -18,8 +18,8 @@ dependencies, no filesystem access and no child processes.
 
 It is a testbed for pipelines that must handle untrusted Markdown, where the
 security posture matters more than feature breadth. Its behaviour is pinned by
-golden input→output pairs rather than prose, so the contract is checkable
-instead of aspirational. [`PRD.md`](./PRD.md) is the authoritative statement of
+golden input→output pairs, so the contract is checkable instead of
+aspirational. [`PRD.md`](./PRD.md) is the authoritative statement of
 the rendering rules and non-goals.
 
 ## Quickstart
@@ -177,7 +177,7 @@ The renderer reads no other environment variables and writes no files.
   is capped at 1,000,000 bytes.
 - One process, one document per request: no streaming or chunked responses, no
   persistence, authentication, rate limiting, metrics or multi-tenancy.
-- The renderer is configured only by environment variables — no config files,
+- The process is configured only by environment variables — no config files,
   no CLI flags.
 - No host or bind-address setting: the process listens on every interface, while
   `docker-compose.yml` publishes it on `127.0.0.1` only.
