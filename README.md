@@ -106,7 +106,8 @@ chunked.
 | Raw request body is over 1,000,000 bytes | `413` | `{"error":"payload too large"}` |
 
 Exactly 100,000 characters of `md` is accepted; only *larger* input is
-rejected.
+rejected. An unexpected internal failure is answered with `500` and
+`{"error":"internal error"}`.
 
 ### Supported syntax
 
@@ -169,7 +170,7 @@ The renderer reads no other environment variables and writes no files.
   is capped at 1,000,000 bytes.
 - One process, one document per request: no streaming or chunked responses, no
   persistence, authentication, rate limiting, metrics or multi-tenancy.
-- Environment variables are the only configuration surface — no config files,
+- The renderer is configured only by environment variables — no config files,
   no CLI flags.
 - No `package.json`, build step or `Dockerfile`; the worker runs the stock
   `node:22-slim` image.
