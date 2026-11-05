@@ -219,9 +219,9 @@ that backs it.
 
 CI runs the unit suite on Node 22, then a delivery job that starts the worker
 container, waits for `/health`, replays the contract and runs the suite inside
-the container. The project is built issue-by-issue by pi-dark-factory; every
-change is verified black-box over HTTP before merge, and the verifier's probe
-contract lives outside this repo by design.
+the container. The project is built issue-by-issue by pi-dark-factory from
+`PRD.md`: every issue ships through the gates above, and the factory's
+acceptance probes live outside this repo by design.
 
 ## Documents
 
