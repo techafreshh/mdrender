@@ -101,9 +101,8 @@ The request `Content-Type` is not checked: the body is always parsed as JSON.
 ### Errors
 
 Every failure is a JSON body, never a crash: the process survives any invalid
-input and keeps serving. Responses always carry `Content-Type:
-application/json` and are framed by `Content-Length` in a single write — never
-chunked.
+input and keeps serving. Responses always carry a JSON content type and are
+framed by `Content-Length` in a single write — never chunked.
 
 | Case | Status | Body |
 | --- | --- | --- |
