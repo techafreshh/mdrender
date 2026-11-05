@@ -67,8 +67,16 @@ PORT=8080 node server.js
 
 ```bash
 docker compose up -d
-curl -s http://127.0.0.1:3000/health
-docker compose logs -f worker   # Ctrl+C to stop following
+curl -s http://127.0.0.1:3000/health   # {"ok":true}
+```
+
+Follow the worker's log, or stop it again:
+
+```bash
+docker compose logs -f worker
+```
+
+```bash
 docker compose down
 ```
 
